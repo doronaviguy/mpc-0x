@@ -21,6 +21,16 @@ A TypeScript server for fetching data about Ethereum Virtual Machine (EVM) addre
 5. Arbitrum (ARB)
 6. Optimism (OP)
 
+## Cursor MCP Compatibility
+
+This server implements the Cursor Model Context Protocol (MCP) which allows it to be used with Cursor applications. The MCP implementation provides:
+
+1. Standardized request/response format with consistent structure
+2. Context ID tracking for request tracing
+3. Operation-based API for different actions
+4. Consistent error handling
+5. Both RESTful and MCP-compatible endpoints
+
 ## Getting Started
 
 ### Prerequisites
@@ -156,6 +166,84 @@ If the address is a contract, the response will include additional contract info
 {
   "contractAbi": "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"}...]",
   "contractName": "ERC20Token"
+}
+```
+
+### Cursor MCP Endpoint
+```
+POST /api/mcp
+```
+
+This endpoint is compatible with the Cursor Model Context Protocol (MCP). It accepts POST requests with a JSON body.
+
+Example request:
+```json
+{
+  "operation": "getAddressData",
+  "address": "0x1234567890123456789012345678901234567890",
+  "context_id": "request-123"
+}
+```
+
+Example response:
+```json
+{
+  "success": true,
+  "data": {
+    "address": "0x1234567890123456789012345678901234567890",
+    "data": [
+      {
+        "chain": {
+          "id": 1,
+          "name": "Ethereum",
+          "priority": 1,
+          "rpcUrl": "",
+          "scanApiUrl": "",
+          "scanApiKey": ""
+        },
+        "nativeBalance": "1000000000000000000",
+        "tokens": [
+          {
+            "token": "0xabcdef1234567890abcdef1234567890abcdef12",
+            "symbol": "TOKEN",
+            "decimals": 18,
+            "balance": "1000000000000000000"
+          }
+        ],
+        "isContract": false,
+        "transactions": [
+          {
+            "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+            "from": "0x1234567890123456789012345678901234567890",
+            "to": "0x0987654321098765432109876543210987654321",
+            "value": "1000000000000000000",
+            "timestamp": 1677750000,
+            "method": "transfer(address,uint256)"
+          }
+        ]
+      }
+    ]
+  },
+  "context_id": "request-123"
+}
+```
+
+#### Supported MCP Operations
+
+1. `getAddressData`: Fetches information about an Ethereum address
+   - Required parameters: `address`
+   - Optional parameters: `context_id`
+
+2. `ping`: Simple health check for the MCP endpoint
+   - Optional parameters: `context_id`
+
+For error cases, the response will have `success: false` and an `error` message:
+
+```json
+{
+  "success": false,
+  "error": "Invalid Ethereum address format",
+  "context_id": "request-123"
 }
 ```
 
