@@ -31,6 +31,101 @@ This server implements the Cursor Model Context Protocol (MCP) which allows it t
 4. Consistent error handling
 5. Both RESTful and MCP-compatible endpoints
 
+## Using with Cursor as an MCP Server
+
+This project can be used as a Model Context Protocol (MCP) server for Cursor. The MCP server provides tools for fetching information about Ethereum addresses directly within Cursor.
+
+### Setup
+
+1. Clone this repository
+2. Install dependencies: `npm install`
+3. Copy `.env.example` to `.env` and fill in your API keys
+4. Build the project: `npm run build`
+
+### Running the MCP Server
+
+To run the MCP server for Cursor using stdio transport:
+
+```bash
+npm run mcp
+```
+
+This will start the MCP server using stdio transport, which is compatible with Cursor.
+
+### Running the MCP Server over HTTP
+
+To run the MCP server over HTTP (which allows you to connect to it from Cursor using a URL):
+
+```bash
+npm run http-mcp
+```
+
+This will start the MCP server on port 3002 (or the port specified in your .env file as MCP_PORT).
+
+### Testing the MCP Server
+
+You can test the stdio MCP server without Cursor using the provided test script:
+
+```bash
+npm run test:cursor-mcp
+```
+
+You can test the HTTP MCP server using:
+
+```bash
+npm run test:http-mcp
+```
+
+These scripts:
+1. Start the MCP server
+2. Send an initialization message
+3. Call the `get-address-info` tool with Vitalik's Ethereum address
+4. Display the response
+
+If everything is working correctly, you should see the address information in the console.
+
+### Configuring Cursor to Use This MCP Server
+
+#### Using Stdio Transport (Recommended)
+
+1. Open Cursor settings
+2. Navigate to the MCP section
+3. Add a new MCP server with the following configuration:
+   - Name: Ethereum Address Info
+   - Command: `cd /path/to/mcp-0x-address && npm run mcp`
+   - Enabled: Yes
+
+#### Using HTTP Transport
+
+1. Open Cursor settings
+2. Navigate to the MCP section
+3. Add a new MCP server with the following configuration:
+   - Name: Ethereum Address Info
+   - URL: `http://localhost:3002/mcp`
+   - Enabled: Yes
+
+Make sure the HTTP server is running before you try to use it in Cursor.
+
+### Available Tools
+
+The MCP server provides the following tools:
+
+- **get-address-info**: Get information about an Ethereum address across multiple chains
+  - Parameters: `address` (Ethereum address to look up)
+  
+- **ping**: Check if the server is running
+  - Parameters: None
+
+### Example Usage in Cursor
+
+Once configured, you can use the MCP server in Cursor by typing commands like:
+
+```
+/get-address-info 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+```
+
+This will fetch and display information about the specified Ethereum address.
+
 ## Getting Started
 
 ### Prerequisites

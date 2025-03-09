@@ -39,7 +39,7 @@ export class CursorMCPService {
 
       // Handle different operations
       switch (request.operation) {
-        case 'getAddressData':
+        case 'get-contract-info':
           return await this.handleGetAddressData(request);
         case 'ping':
           return {

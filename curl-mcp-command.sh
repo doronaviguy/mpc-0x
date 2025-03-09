@@ -1,0 +1,1 @@
+curl -X POST http://localhost:3002/api/mcp -H "Content-Type: application/json" -d '{"operation": "get-contract-info", "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "context_id": "test-123"}'
