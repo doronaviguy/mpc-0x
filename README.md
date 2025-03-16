@@ -1,354 +1,234 @@
-# MCP 0x Address Server
+# MCP Ethereum Address Info Server
 
-A TypeScript server for fetching data about Ethereum Virtual Machine (EVM) addresses across multiple chains. The server prioritizes chains by popularity (Ethereum first, then BSC, etc.) and provides detailed information about addresses, including balance data, contract information, and transaction history.
+This server provides information about Ethereum addresses across multiple chains using the Model Context Protocol (MCP). It includes a Server-Sent Events (SSE) endpoint for real-time updates.
 
-## Features
+## Table of Contents
 
-- Address validation and checksumming
-- Multi-chain support with priority ordering
-- Native balance fetching for each chain
-- Token balance fetching on all supported chains
-- Contract detection and ABI fetching
-- Transaction history retrieval
-- Support for multiple EVM-compatible chains
+- [Setup](#setup)
+- [Running the Server](#running-the-server)
+- [Available Endpoints](#available-endpoints)
+- [Using the SSE Endpoint](#using-the-sse-endpoint)
+- [Testing with Curl](#testing-with-curl)
+- [Example Workflow](#example-workflow)
 
-## Supported Chains
+## Setup
 
-1. Ethereum (ETH) - Highest priority
-2. Binance Smart Chain (BSC)
-3. Polygon (MATIC)
-4. Avalanche (AVAX)
-5. Arbitrum (ARB)
-6. Optimism (OP)
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd mcp-0x-address
+   ```
 
-## Cursor MCP Compatibility
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-This server implements the Cursor Model Context Protocol (MCP) which allows it to be used with Cursor applications. The MCP implementation provides:
+3. Create a `.env` file with the following variables:
+   ```
+   MCP_PORT=3002
+   ```
 
-1. Standardized request/response format with consistent structure
-2. Context ID tracking for request tracing
-3. Operation-based API for different actions
-4. Consistent error handling
-5. Both RESTful and MCP-compatible endpoints
+## Running the Server
 
-## Using with Cursor as an MCP Server
-
-This project can be used as a Model Context Protocol (MCP) server for Cursor. The MCP server provides tools for fetching information about Ethereum addresses directly within Cursor.
-
-### Setup
-
-1. Clone this repository
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env` and fill in your API keys
-4. Build the project: `npm run build`
-
-### Running the MCP Server
-
-To run the MCP server for Cursor using stdio transport:
+Start the HTTP MCP server:
 
 ```bash
-npm run mcp
+npm run start:http
 ```
 
-This will start the MCP server using stdio transport, which is compatible with Cursor.
+This will start the server on port 3002 (or the port specified in your `.env` file).
 
-### Running the MCP Server over HTTP
+## Available Endpoints
 
-To run the MCP server over HTTP (which allows you to connect to it from Cursor using a URL):
+The server provides the following endpoints:
+
+- `GET /health` - Server health check
+- `POST /mcp` - MCP endpoint for tool calls
+- `GET /sse` - Server-Sent Events endpoint for real-time updates
+- `GET /sse/clients` - Get information about connected SSE clients
+- `POST /sse/subscribe/:clientId` - Subscribe to address updates
+- `POST /sse/unsubscribe/:clientId` - Unsubscribe from address updates
+
+## Using the SSE Endpoint
+
+The SSE endpoint allows clients to receive real-time updates from the server. Here's how to use it:
+
+1. Connect to the SSE endpoint
+2. Get your client ID from the connection response
+3. Subscribe to specific addresses
+4. Receive real-time updates for those addresses
+
+## Testing with Curl
+
+### 1. Connect to the SSE Endpoint
 
 ```bash
-npm run http-mcp
+curl -N http://localhost:3002/sse
 ```
 
-This will start the MCP server on port 3002 (or the port specified in your .env file as MCP_PORT).
+This will establish a connection to the SSE endpoint and start receiving events. The connection will remain open until you manually terminate it.
 
-### Testing the MCP Server
-
-You can test the stdio MCP server without Cursor using the provided test script:
+### 2. Check Connected Clients
 
 ```bash
-npm run test:cursor-mcp
+curl http://localhost:3002/sse/clients
 ```
 
-You can test the HTTP MCP server using:
+### 3. Subscribe to Address Updates
+
+After connecting to the SSE endpoint, you'll receive a client ID. Use that ID to subscribe to address updates:
 
 ```bash
-npm run test:http-mcp
+curl -X POST \
+  http://localhost:3002/sse/subscribe/YOUR_CLIENT_ID \
+  -H "Content-Type: application/json" \
+  -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"]}'
 ```
 
-These scripts:
-1. Start the MCP server
-2. Send an initialization message
-3. Call the `get-address-info` tool with Vitalik's Ethereum address
-4. Display the response
+Replace `YOUR_CLIENT_ID` with the client ID you received when connecting to the SSE endpoint.
 
-If everything is working correctly, you should see the address information in the console.
-
-### Configuring Cursor to Use This MCP Server
-
-#### Using Stdio Transport (Recommended)
-
-1. Open Cursor settings
-2. Navigate to the MCP section
-3. Add a new MCP server with the following configuration:
-   - Name: Ethereum Address Info
-   - Command: `cd /path/to/mcp-0x-address && npm run mcp`
-   - Enabled: Yes
-
-#### Using HTTP Transport
-
-1. Open Cursor settings
-2. Navigate to the MCP section
-3. Add a new MCP server with the following configuration:
-   - Name: Ethereum Address Info
-   - URL: `http://localhost:3002/mcp`
-   - Enabled: Yes
-
-Make sure the HTTP server is running before you try to use it in Cursor.
-
-### Available Tools
-
-The MCP server provides the following tools:
-
-- **get-address-info**: Get information about an Ethereum address across multiple chains
-  - Parameters: `address` (Ethereum address to look up)
-  
-- **ping**: Check if the server is running
-  - Parameters: None
-
-### Example Usage in Cursor
-
-Once configured, you can use the MCP server in Cursor by typing commands like:
-
-```
-/get-address-info 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
-```
-
-This will fetch and display information about the specified Ethereum address.
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js v16+
-- npm or yarn
-
-### Installation
-
-1. Clone the repository
-```bash
-git clone https://github.com/yourusername/mcp-0x-address.git
-cd mcp-0x-address
-```
-
-2. Install dependencies
-```bash
-npm install
-```
-
-3. Set up environment variables
-```bash
-cp .env.example .env
-```
-
-4. Edit the `.env` file to add your:
-   - RPC URLs for each chain
-   - Block explorer API keys (Etherscan, BSCScan, etc.)
-   - Server configuration
-
-### Configuration
-
-Create a `.env` file with the following structure:
-
-```
-# Chain RPC endpoints
-ETH_RPC_URL=https://ethereum.publicnode.com
-BSC_RPC_URL=https://binance.publicnode.com
-POLYGON_RPC_URL=https://polygon-mainnet.public.blastapi.io
-AVALANCHE_RPC_URL=https://api.avax.network/ext/bc/C/rpc
-ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
-OPTIMISM_RPC_URL=https://mainnet.optimism.io
-
-# Block explorer API keys
-ETHERSCAN_API_KEY=your_etherscan_api_key_here
-BSCSCAN_API_KEY=your_bscscan_api_key_here
-POLYGONSCAN_API_KEY=your_polygonscan_api_key_here
-SNOWTRACE_API_KEY=your_snowtrace_api_key_here
-ARBISCAN_API_KEY=your_arbiscan_api_key_here
-OPTIMISTIC_ETHERSCAN_API_KEY=your_optimism_etherscan_api_key_here
-
-# Server configuration
-PORT=3001
-```
-
-### Running the Server
+### 4. Unsubscribe from Address Updates
 
 ```bash
-# Development mode
-npm run dev
-
-# Build
-npm run build
-
-# Production mode
-npm run start
+curl -X POST \
+  http://localhost:3002/sse/unsubscribe/YOUR_CLIENT_ID \
+  -H "Content-Type: application/json" \
+  -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e"]}'
 ```
 
-## API Endpoints
+### 5. Trigger an Address Update
 
-### Health Check
-```
-GET /health
-```
-Response:
-```json
-{
-  "status": "ok"
-}
-```
+To trigger an address update (which will be sent to subscribed clients), call the `get-address-info` tool:
 
-### Get Address Data
-```
-GET /api/address/:address
-```
-
-Example request:
-```
-GET /api/address/0x1234567890123456789012345678901234567890
-```
-
-Example response:
-```json
-{
-  "address": "0x1234567890123456789012345678901234567890",
-  "data": [
-    {
-      "chain": {
-        "id": 1,
-        "name": "Ethereum",
-        "priority": 1,
-        "rpcUrl": "",
-        "scanApiUrl": "",
-        "scanApiKey": ""
-      },
-      "nativeBalance": "1000000000000000000",
-      "tokens": [
-        {
-          "token": "0xabcdef1234567890abcdef1234567890abcdef12",
-          "symbol": "TOKEN",
-          "decimals": 18,
-          "balance": "1000000000000000000"
-        }
-      ],
-      "isContract": false,
-      "transactions": [
-        {
-          "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-          "from": "0x1234567890123456789012345678901234567890",
-          "to": "0x0987654321098765432109876543210987654321",
-          "value": "1000000000000000000",
-          "timestamp": 1677750000,
-          "method": "transfer(address,uint256)"
-        }
-      ]
-    }
-  ]
-}
-```
-
-If the address is a contract, the response will include additional contract information:
-```json
-{
-  "contractAbi": "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"}...]",
-  "contractName": "ERC20Token"
-}
-```
-
-### Cursor MCP Endpoint
-```
-POST /api/mcp
-```
-
-This endpoint is compatible with the Cursor Model Context Protocol (MCP). It accepts POST requests with a JSON body.
-
-Example request:
-```json
-{
-  "operation": "getAddressData",
-  "address": "0x1234567890123456789012345678901234567890",
-  "context_id": "request-123"
-}
-```
-
-Example response:
-```json
-{
-  "success": true,
-  "data": {
-    "address": "0x1234567890123456789012345678901234567890",
-    "data": [
-      {
-        "chain": {
-          "id": 1,
-          "name": "Ethereum",
-          "priority": 1,
-          "rpcUrl": "",
-          "scanApiUrl": "",
-          "scanApiKey": ""
-        },
-        "nativeBalance": "1000000000000000000",
-        "tokens": [
-          {
-            "token": "0xabcdef1234567890abcdef1234567890abcdef12",
-            "symbol": "TOKEN",
-            "decimals": 18,
-            "balance": "1000000000000000000"
-          }
-        ],
-        "isContract": false,
-        "transactions": [
-          {
-            "hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-            "from": "0x1234567890123456789012345678901234567890",
-            "to": "0x0987654321098765432109876543210987654321",
-            "value": "1000000000000000000",
-            "timestamp": 1677750000,
-            "method": "transfer(address,uint256)"
-          }
-        ]
+```bash
+curl -X POST \
+  http://localhost:3002/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get-address-info",
+      "arguments": {
+        "address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
       }
-    ]
-  },
-  "context_id": "request-123"
-}
+    }
+  }'
 ```
 
-#### Supported MCP Operations
+### 6. Check Server Health
 
-1. `getAddressData`: Fetches information about an Ethereum address
-   - Required parameters: `address`
-   - Optional parameters: `context_id`
-
-2. `ping`: Simple health check for the MCP endpoint
-   - Optional parameters: `context_id`
-
-For error cases, the response will have `success: false` and an `error` message:
-
-```json
-{
-  "success": false,
-  "error": "Invalid Ethereum address format",
-  "context_id": "request-123"
-}
+```bash
+curl http://localhost:3002/health
 ```
 
-## Error Handling
+### 7. Test the Ping Tool
 
-The API returns appropriate HTTP status codes:
-- 200: Successful request
-- 400: Invalid address format
-- 500: Server error
+```bash
+curl -X POST \
+  http://localhost:3002/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "ping",
+      "arguments": {}
+    }
+  }'
+```
 
-## License
+## Example Workflow
 
-MIT
+Here's a complete workflow for testing the SSE functionality:
+
+1. Start the server:
+   ```bash
+   npm run start:http
+   ```
+
+2. In a new terminal, connect to the SSE endpoint:
+   ```bash
+   curl -N http://localhost:3002/sse
+   ```
+
+   You'll receive a response like:
+   ```
+   data: {"type":"connection","clientId":"client-1234567890abcdef","message":"Connected to MCP SSE endpoint","timestamp":"2023-01-01T00:00:00.000Z"}
+   ```
+
+3. Note the `clientId` from the response.
+
+4. In another terminal, subscribe to address updates:
+   ```bash
+   curl -X POST \
+     http://localhost:3002/sse/subscribe/client-1234567890abcdef \
+     -H "Content-Type: application/json" \
+     -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e"]}'
+   ```
+
+5. Trigger an address update:
+   ```bash
+   curl -X POST \
+     http://localhost:3002/mcp \
+     -H "Content-Type: application/json" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 1,
+       "method": "tools/call",
+       "params": {
+         "name": "get-address-info",
+         "arguments": {
+           "address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+         }
+       }
+     }'
+   ```
+
+6. In the terminal where you're connected to the SSE endpoint, you'll see updates for the address.
+
+## Automated Testing Script
+
+For a more automated test, you can use this bash script:
+
+```bash
+#!/bin/bash
+
+# Start SSE connection in the background and capture the output
+curl -N http://localhost:3002/sse > sse_output.txt &
+SSE_PID=$!
+
+# Wait a moment for the connection to establish
+sleep 2
+
+# Extract the client ID from the output
+CLIENT_ID=$(grep -o '"clientId":"[^"]*"' sse_output.txt | head -1 | cut -d'"' -f4)
+
+if [ -z "$CLIENT_ID" ]; then
+  echo "Failed to get client ID"
+  kill $SSE_PID
+  exit 1
+fi
+
+echo "Connected with client ID: $CLIENT_ID"
+
+# Subscribe to an address
+curl -X POST \
+  http://localhost:3002/sse/subscribe/$CLIENT_ID \
+  -H "Content-Type: application/json" \
+  -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e"]}'
+
+echo "Subscribed to address. Waiting for updates..."
+echo "Press Ctrl+C to stop"
+
+# Keep the script running to see updates
+tail -f sse_output.txt
+
+# Clean up on exit
+trap "kill $SSE_PID; rm sse_output.txt" EXIT
+```
+
+Save this as `test_sse.sh`, make it executable with `chmod +x test_sse.sh`, and run it with `./test_sse.sh`.

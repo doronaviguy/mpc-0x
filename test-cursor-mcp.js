@@ -1,97 +1,98 @@
-const { spawn } = require('child_process');
-const readline = require('readline');
+// Test script for the Cursor MCP server
 
-// Test address - Vitalik's address
-const testAddress = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+const { spawn } = require('child_process');
+const path = require('path');
+
+// Sample Ethereum address to test with
+const testAddress = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'; // Vitalik's address
 
 // Start the MCP server process
-console.log('Starting MCP server...');
-const mcpProcess = spawn('ts-node', ['src/cursor-mcp-server.ts'], {
+const serverProcess = spawn('ts-node', ['src/cursor-mcp-server.ts'], {
   stdio: ['pipe', 'pipe', process.stderr]
 });
 
-// Create interface to read/write to the MCP server
-const rl = readline.createInterface({
-  input: mcpProcess.stdout,
-  output: mcpProcess.stdin,
-  terminal: false
-});
-
-// Track initialization status
-let initialized = false;
-
 // Handle server output
-rl.on('line', (line) => {
+serverProcess.stdout.on('data', (data) => {
+  console.log(`Server output: ${data}`);
+});
+
+// Function to send a request to the MCP server
+function sendRequest(request) {
+  return new Promise((resolve, reject) => {
+    // Convert request to JSON string
+    const requestStr = JSON.stringify(request);
+    
+    // Write the request to the server's stdin
+    serverProcess.stdin.write(requestStr + '\n');
+    
+    // Set up a listener for the response
+    const onData = (data) => {
+      try {
+        // Parse the response
+        const response = JSON.parse(data.toString());
+        
+        // Remove the listener to avoid processing further data
+        serverProcess.stdout.removeListener('data', onData);
+        
+        // Resolve with the response
+        resolve(response);
+      } catch (error) {
+        console.error('Error parsing response:', error);
+        reject(error);
+      }
+    };
+    
+    // Add the listener
+    serverProcess.stdout.on('data', onData);
+  });
+}
+
+// Test the get-address-info tool
+async function testGetAddressInfo() {
+  console.log(`Testing get-address-info with address: ${testAddress}`);
+  
+  const request = {
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'get-address-info',
+    params: {
+      address: testAddress
+    }
+  };
+  
   try {
-    const message = JSON.parse(line);
-    console.log('\nReceived message from server:');
-    console.log(JSON.stringify(message, null, 2));
-    
-    // Check if this is the initialization response
-    if (message.id === 1 && message.result) {
-      console.log('\nServer initialized successfully!');
-      initialized = true;
-      
-      // Send the tool request after initialization
-      console.log('\nSending get-address-info request...');
-      const toolRequest = {
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'tools/call',
-        params: {
-          name: 'get-address-info',
-          arguments: {
-            address: testAddress
-          }
-        }
-      };
-      mcpProcess.stdin.write(JSON.stringify(toolRequest) + '\n');
-      pendingRequests[2] = toolRequest;
-    }
-    
-    // Check if this is the tool response
-    if (message.id === 2) {
-      console.log('\nTool request completed successfully!');
-      setTimeout(() => {
-        mcpProcess.kill();
-        process.exit(0);
-      }, 1000);
-    }
+    const response = await sendRequest(request);
+    console.log('Response:', JSON.stringify(response, null, 2));
   } catch (error) {
-    console.error('Error parsing server message:', error);
+    console.error('Error:', error);
+  } finally {
+    // Kill the server process
+    serverProcess.kill();
   }
-});
+}
 
-// Track pending requests
-const pendingRequests = {};
-
-// Send initialization message
-console.log('\nSending initialization message...');
-const initMessage = {
-  jsonrpc: '2.0',
-  id: 1,
-  method: 'initialize',
-  params: {
-    protocolVersion: '0.1.0',
-    capabilities: {},
-    clientInfo: {
-      name: 'test-client',
-      version: '1.0.0'
-    }
+// Test the ping tool
+async function testPing() {
+  console.log('Testing ping tool');
+  
+  const request = {
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'ping',
+    params: {}
+  };
+  
+  try {
+    const response = await sendRequest(request);
+    console.log('Response:', JSON.stringify(response, null, 2));
+    
+    // After successful ping, test the get-address-info tool
+    await testGetAddressInfo();
+  } catch (error) {
+    console.error('Error:', error);
+    serverProcess.kill();
   }
-};
-mcpProcess.stdin.write(JSON.stringify(initMessage) + '\n');
-pendingRequests[1] = initMessage;
+}
 
-// Handle process exit
-process.on('SIGINT', () => {
-  mcpProcess.kill();
-  process.exit(0);
-});
-
-// Set timeout to kill the process if it hangs
-setTimeout(() => {
-  console.error('Test timed out after 15 seconds');
-  mcpProcess.kill();
-  process.exit(1);
-}, 15000); 
+// Start testing
+testPing(); 

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP SSE Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .events {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+        .event {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .event-connection {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .event-heartbeat {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+        .event-tool-call {
+            background-color: #cce5ff;
+            border: 1px solid #b8daff;
+        }
+        .event-address-update {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+        }
+        .event-subscription-update {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .connected {
+            color: green;
+        }
+        .disconnected {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>MCP Server-Sent Events (SSE) Demo</h1>
+    <p>This page demonstrates how to use the SSE endpoint of the MCP server to receive real-time updates.</p>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Connection</h2>
+            <div class="status disconnected" id="connection-status">Disconnected</div>
+            <button id="connect-btn">Connect to SSE</button>
+            <button id="disconnect-btn" disabled>Disconnect</button>
+            
+            <h3>Client Information</h3>
+            <div id="client-info">Not connected</div>
+            
+            <h2>Address Subscription</h2>
+            <label for="address-input">Ethereum Address:</label>
+            <input type="text" id="address-input" placeholder="0x742d35Cc6634C0532925a3b844Bc454e4438f44e" value="0x742d35Cc6634C0532925a3b844Bc454e4438f44e">
+            <button id="subscribe-btn" disabled>Subscribe</button>
+            <button id="unsubscribe-btn" disabled>Unsubscribe</button>
+            
+            <h3>Subscribed Addresses</h3>
+            <div id="subscribed-addresses">None</div>
+            
+            <h2>Tools</h2>
+            <button id="get-address-info-btn" disabled>Call get-address-info</button>
+            <button id="ping-btn" disabled>Call ping</button>
+        </div>
+        
+        <div class="panel">
+            <h2>Events</h2>
+            <button id="clear-events-btn">Clear Events</button>
+            <div class="events" id="events-container"></div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const subscribeBtn = document.getElementById('subscribe-btn');
+        const unsubscribeBtn = document.getElementById('unsubscribe-btn');
+        const getAddressInfoBtn = document.getElementById('get-address-info-btn');
+        const pingBtn = document.getElementById('ping-btn');
+        const clearEventsBtn = document.getElementById('clear-events-btn');
+        const eventsContainer = document.getElementById('events-container');
+        const connectionStatus = document.getElementById('connection-status');
+        const clientInfo = document.getElementById('client-info');
+        const subscribedAddresses = document.getElementById('subscribed-addresses');
+        const addressInput = document.getElementById('address-input');
+        
+        // State
+        let eventSource = null;
+        let clientId = null;
+        let subscribedAddressList = [];
+        
+        // Functions
+        function addEvent(event) {
+            const eventData = JSON.parse(event.data);
+            const eventType = eventData.type;
+            
+            const eventElement = document.createElement('div');
+            eventElement.className = `event event-${eventType}`;
+            
+            const timestamp = new Date(eventData.timestamp).toLocaleTimeString();
+            const header = document.createElement('div');
+            header.innerHTML = `<strong>${eventType}</strong> (${timestamp})`;
+            eventElement.appendChild(header);
+            
+            const content = document.createElement('pre');
+            content.textContent = JSON.stringify(eventData, null, 2);
+            eventElement.appendChild(content);
+            
+            eventsContainer.appendChild(eventElement);
+            eventsContainer.scrollTop = eventsContainer.scrollHeight;
+            
+            // Handle specific event types
+            if (eventType === 'connection') {
+                clientId = eventData.clientId;
+                clientInfo.innerHTML = `Client ID: ${clientId}<br>Connected at: ${timestamp}`;
+            } else if (eventType === 'subscription-update') {
+                subscribedAddressList = eventData.subscribedAddresses;
+                updateSubscribedAddresses();
+            }
+        }
+        
+        function updateSubscribedAddresses() {
+            if (subscribedAddressList.length === 0) {
+                subscribedAddresses.textContent = 'None';
+            } else {
+                subscribedAddresses.innerHTML = subscribedAddressList.map(addr => 
+                    `<div>${addr}</div>`
+                ).join('');
+            }
+        }
+        
+        function connectSSE() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource('http://localhost:3002/sse');
+            
+            eventSource.onopen = () => {
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+                unsubscribeBtn.disabled = false;
+                getAddressInfoBtn.disabled = false;
+                pingBtn.disabled = false;
+            };
+            
+            eventSource.onmessage = (event) => {
+                addEvent(event);
+            };
+            
+            eventSource.onerror = () => {
+                disconnectSSE();
+                connectionStatus.textContent = 'Connection failed. Retry?';
+                connectionStatus.className = 'status disconnected';
+            };
+        }
+        
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            connectionStatus.textContent = 'Disconnected';
+            connectionStatus.className = 'status disconnected';
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            subscribeBtn.disabled = true;
+            unsubscribeBtn.disabled = true;
+            getAddressInfoBtn.disabled = true;
+            pingBtn.disabled = true;
+            clientId = null;
+            clientInfo.textContent = 'Not connected';
+        }
+        
+        function subscribeToAddress() {
+            const address = addressInput.value.trim();
+            if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+                alert('Please enter a valid Ethereum address');
+                return;
+            }
+            
+            if (!clientId) {
+                alert('Not connected to SSE. Please connect first.');
+                return;
+            }
+            
+            fetch(`http://localhost:3002/sse/subscribe/${clientId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    addresses: [address]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Subscription response:', data);
+            })
+            .catch(error => {
+                console.error('Error subscribing to address:', error);
+                alert('Error subscribing to address. See console for details.');
+            });
+        }
+        
+        function unsubscribeFromAddress() {
+            const address = addressInput.value.trim();
+            if (!address) {
+                alert('Please enter an address to unsubscribe from');
+                return;
+            }
+            
+            if (!clientId) {
+                alert('Not connected to SSE. Please connect first.');
+                return;
+            }
+            
+            fetch(`http://localhost:3002/sse/unsubscribe/${clientId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    addresses: [address]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Unsubscription response:', data);
+            })
+            .catch(error => {
+                console.error('Error unsubscribing from address:', error);
+                alert('Error unsubscribing from address. See console for details.');
+            });
+        }
+        
+        function callGetAddressInfo() {
+            const address = addressInput.value.trim();
+            if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+                alert('Please enter a valid Ethereum address');
+                return;
+            }
+            
+            fetch('http://localhost:3002/mcp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'tools/call',
+                    params: {
+                        name: 'get-address-info',
+                        arguments: {
+                            address: address
+                        }
+                    }
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('get-address-info response:', data);
+            })
+            .catch(error => {
+                console.error('Error calling get-address-info:', error);
+                alert('Error calling get-address-info. See console for details.');
+            });
+        }
+        
+        function callPing() {
+            fetch('http://localhost:3002/mcp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'tools/call',
+                    params: {
+                        name: 'ping',
+                        arguments: {}
+                    }
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('ping response:', data);
+            })
+            .catch(error => {
+                console.error('Error calling ping:', error);
+                alert('Error calling ping. See console for details.');
+            });
+        }
+        
+        function clearEvents() {
+            eventsContainer.innerHTML = '';
+        }
+        
+        // Event Listeners
+        connectBtn.addEventListener('click', connectSSE);
+        disconnectBtn.addEventListener('click', disconnectSSE);
+        subscribeBtn.addEventListener('click', subscribeToAddress);
+        unsubscribeBtn.addEventListener('click', unsubscribeFromAddress);
+        getAddressInfoBtn.addEventListener('click', callGetAddressInfo);
+        pingBtn.addEventListener('click', callPing);
+        clearEventsBtn.addEventListener('click', clearEvents);
+    </script>
+</body>
+</html> 

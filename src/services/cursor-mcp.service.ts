@@ -40,7 +40,17 @@ export class CursorMCPService {
       // Handle different operations
       switch (request.operation) {
         case 'get-contract-info':
-          return await this.handleGetAddressData(request);
+          if (!request.address || !request.context_id) {
+            return {
+              success: false,
+              error: 'Missing required parameters: address or context_id',
+              context_id: request.context_id
+            };
+          }
+          return await this.handleGetAddressData({
+            address: request.address,
+            context_id: request.context_id
+          });
         case 'ping':
           return {
             success: true,
@@ -69,7 +79,7 @@ export class CursorMCPService {
    * @param request The Cursor MCP request
    * @returns A formatted Cursor MCP response with address data
    */
-  private async handleGetAddressData(request: CursorMCPRequest): Promise<CursorMCPResponse> {
+  private async handleGetAddressData(request: { address: string, context_id: string }): Promise<CursorMCPResponse> {
     if (!request.address) {
       return {
         success: false,
